@@ -1,0 +1,97 @@
+# ARG BASE_TAG
+# FROM quay.io/accord/theia-jupyter-base:${BASE_TAG}
+ARG BASE_TAG
+FROM quay.io/accord/theia-jupyter-base:${BASE_TAG}
+
+ENV NODE_VERSION 12.18.3
+ENV YARN_VERSION 1.22.5
+ENV ARCH x64
+
+# Excerpt from: https://github.com/nodejs/docker-node/blob/master/12/buster/Dockerfile
+# gpg keys listed at https://github.com/nodejs/node#release-keys
+RUN set -ex \
+    && for key in \
+    4ED778F539E3634C779C87C6D7062848A1AB005C \
+    B9E2F5981AA6E0CD28160D9FF13993A75599653C \
+    94AE36675C464D64BAFA68DD7434390BDBE9B9C5 \
+    B9AE9905FFD7803F25714661B63B535A4C206CA9 \
+    77984A986EBC2AA786BC0F66B01FBB92821C587A \
+    71DCFD284A79C3B38668286BC97EC7A07EDE3FC1 \
+    FD3A5288F042B6850C66B31F09FE44734EB7990E \
+    8FCCA13FEF1D0C2E91008E09770F7A9A5AE15600 \
+    C4F0DFFF4E8C1A8236409D08E73BC641CC11F4C8 \
+    DD8F2338BAE7501E3DD5AC78C273792F7D83545D \
+    A48C2BEE680E841632CD4E44F07496B3EB3C1762 \
+    ; do \
+    gpg --batch --keyserver keyserver.ubuntu.com --recv-key "$key" || \
+    gpg --batch --keyserver keys.openpgp.org --recv-key "$key" || \
+    gpg --batch --keyserver pgp.mit.edu --recv-keys "$key" || \
+    gpg --batch --keyserver keyserver.pgp.com --recv-keys "$key" ; \
+    done
+
+RUN ARCH=${ARCH} \
+    && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-$ARCH.tar.xz" \
+    && curl -SLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
+    && gpg --batch --decrypt --output SHASUMS256.txt SHASUMS256.txt.asc \
+    && grep " node-v$NODE_VERSION-linux-$ARCH.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
+    && tar -xJf "node-v$NODE_VERSION-linux-$ARCH.tar.xz" -C /usr/local --strip-components=1 --no-same-owner \
+    && rm "node-v$NODE_VERSION-linux-$ARCH.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
+    && ln -s /usr/local/bin/node /usr/local/bin/nodejs \
+    && node --version \
+    && npm --version
+
+RUN set -ex \
+    && for key in \
+    6A010C5166006599AA17F08146C2130DFD2497F5 \
+    ; do \
+    gpg --batch --keyserver keyserver.ubuntu.com --recv-key "$key" || \
+    gpg --batch --keyserver keys.openpgp.org --recv-key "$key" || \
+    gpg --batch --keyserver pgp.mit.edu --recv-key "$key" || \
+    gpg --batch --keyserver keyserver.pgp.com --recv-keys "$key" ; \
+    done \
+    && curl -fSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz" \
+    && curl -fSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz.asc" \
+    && gpg --batch --verify yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \
+    && mkdir -p /opt/yarn \
+    && tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/yarn --strip-components=1 \
+    && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarn \
+    && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarnpkg \
+    && rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz
+
+ARG THEIA_VERSION=latest
+ARG THEIA_HOME=/usr/local/theia
+
+WORKDIR ${THEIA_HOME}
+# Retrieved from https://raw.githubusercontent.com/theia-ide/theia-apps/master/theia-full-docker/latest.package.json
+ADD ./theia-jupyter-base/${THEIA_VERSION}.package.json ./package.json
+ARG GITHUB_TOKEN
+RUN chmod 0755 ${THEIA_HOME} && \
+  yarn --pure-lockfile && \
+  NODE_OPTIONS="--max_old_space_size=8192" yarn theia build && \
+  yarn theia download:plugins --ignore-errors && \
+  yarn --production && \
+  yarn autoclean --init && \
+  echo *.ts >> .yarnclean && \
+  echo *.ts.map >> .yarnclean && \
+  echo *.spec.* >> .yarnclean && \
+  yarn autoclean --force && \
+  yarn cache clean
+
+
+COPY ./theia-jupyter-base/entrypoint-theia.sh /usr/local/bin/
+# No changes for theia-python
+
+# Theia boilerplate
+EXPOSE 3000
+ENV SHELL=/bin/bash \
+  THEIA_DEFAULT_PLUGINS=local-dir:/usr/local/theia/plugins \
+  USE_LOCAL_GIT=true
+WORKDIR /usr/local/theia
+USER 490
+# ENV PIP_TARGET=/home/user/.local
+ENV HTTP_PROXY=http://figgis-s.hpc.virginia.edu:8080
+ENV HTTPS_PROXY=http://figgis-s.hpc.virginia.edu:8080
+ENV http_proxy=http://figgis-s.hpc.virginia.edu:8080
+ENV https_proxy=http://figgis-s.hpc.virginia.edu:8080
+ENTRYPOINT [ "entrypoint-theia.sh" ]
+# /Theia boilerplate

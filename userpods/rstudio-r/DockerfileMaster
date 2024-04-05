@@ -1,0 +1,17 @@
+ARG BASE_TAG
+FROM quay.io/accord/rstudio-base:${BASE_TAG}
+
+# No changes for rstudio-r
+
+# RStudio boilerplate
+EXPOSE 8787
+ENV USER=user
+WORKDIR /home/user
+USER 490
+ENV PIP_TARGET=/home/user/.local
+ENV HTTP_PROXY=http://figgis-s.hpc.virginia.edu:8080
+ENV HTTPS_PROXY=http://figgis-s.hpc.virginia.edu:8080
+ENV http_proxy=http://figgis-s.hpc.virginia.edu:8080
+ENV https_proxy=http://figgis-s.hpc.virginia.edu:8080
+ENTRYPOINT [ "entrypoint-rstudio.sh" ]
+# /RStudio boilerplate

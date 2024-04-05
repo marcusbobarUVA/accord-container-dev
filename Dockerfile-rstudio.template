@@ -1,0 +1,12 @@
+FROM quay.io/accord/rstudio-base:latest
+
+USER root
+< ... add workload stuff here! ... >
+
+# RStudio boilerplate
+EXPOSE 8787
+ENV USER=user
+WORKDIR /home
+USER 490
+ENTRYPOINT [ "entrypoint-rstudio.sh" ]
+# /RStudio boilerplate

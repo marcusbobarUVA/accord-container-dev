@@ -1,0 +1,2 @@
+PYTHONPATH=/home/user/.local
+export PYTHONPATH

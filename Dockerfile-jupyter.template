@@ -1,0 +1,11 @@
+FROM quay.io/accord/theia-jupyter-base:latest
+
+USER root
+< ... add workload stuff here! ... >
+
+# Jupyter boilerplate
+EXPOSE 8888
+WORKDIR /home
+USER 490
+ENTRYPOINT [ "entrypoint-jupyter.sh" ]
+# /Jupyter boilerplate
